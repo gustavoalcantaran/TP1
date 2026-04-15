@@ -74,6 +74,13 @@ const SFX = {
     },
     
 }
+//Variáveis para o Fundo
+let bgOffsetY = 0;
+let bgMatrix;
+
+//Color
+let u_colorLocation;
+
 //Model
 let u_modelMatrixLocation;
 
@@ -137,7 +144,15 @@ let rounds = 1;
 //Score para mostrar na tela
 const scoreElement = document.getElementById('score-ui');
 let score = 0;
-
+const BestScoreElement = document.getElementById('best-score');
+let bestScore = 0;
+const storedBestScore = localStorage.getItem('bestScore');
+if (storedBestScore !== null) {
+    bestScore = parseInt(storedBestScore);
+}
+if (BestScoreElement){
+    BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
+}
 const keys = {
     w : false,
     a : false,
@@ -185,12 +200,23 @@ function startGame(){
 
 function checkWinCondition(){
     if(enemiesAlive <= 0){
+        checkBestScore();
         vitoriaScoreElement.innerText = `Sua pontuação: ${score}`;
         gamePaused = true;
         vitoriaMenu.style.display = 'flex';
         pauseMenu.style.display = 'none';
         controlsMenu.style.display = 'none';
         settingsMenu.style.display = 'none';
+    }
+}
+
+function checkBestScore(){
+    if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('bestScore', bestScore);
+        if (BestScoreElement) {
+            BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
+        }
     }
 }
 
@@ -239,6 +265,7 @@ function initEnemies(){
 }
 
 function gameOver(){
+    checkBestScore();
     gamePaused = true;
     gameOverScoreElement.innerText = `Sua pontuação: ${score}`;
     gameoverMenu.style.display = 'flex';
@@ -266,6 +293,7 @@ function checkPlayerShootCollision(shoot, enemy){
     
     return distanceSquare < radiusSumSquare;
 }
+
 function enemyExplosion(enemy){
     explosions.push({
         x: enemy.x,
@@ -285,6 +313,7 @@ function updateCollisionEnemies() {
                 shotHit = true;
                 score += enemy.points * (rounds*0.5); // Incrementa a pontuação
                 scoreElement.innerText = `Score: ${score}`;
+                checkBestScore();
                 SFX.playExplosion(masterVolume);
                 enemyExplosion(enemy);
                 enemiesAlive--;
@@ -571,7 +600,7 @@ function resetGame(){
 }
 
 function keyboardHandler(){
-    if (vitoriaMenu.style.display === 'flex') {
+    if (vitoriaMenu.style.display === 'flex' || gameoverMenu.style.display === 'flex' || startMenu.style.display === 'flex') {
         return;
     }
     // Como a minha nave tem 16 de largura para um lado e 16 para o outro, coloquei que
@@ -590,7 +619,7 @@ function keyboardHandler(){
             scene.shipX += 0.5;
     }
     const currentTime = performance.now();
-    if (keys.space && (currentTime - lastShootTime > 100) && !gamePaused){
+    if (keys.space && (currentTime - lastShootTime > 500) && !gamePaused){
         const centroX = scene.shipX
         const topoY = scene.shipY + 5
         shoots.push({
@@ -764,6 +793,9 @@ export function initialize(gl){
     //Uniform para ver se é cor ou textura
     u_PointLocation = gl.getUniformLocation(program, "u_isPoint");
 
+    //Uniform para setar as cores
+    u_colorLocation = gl.getUniformLocation(program, "u_color");
+
     //Uniform para controlar as texturas com animações
     u_uvOffsetLocation = gl.getUniformLocation(program, "u_uvOffset");
     u_uvScaleLocation = gl.getUniformLocation(program, "u_uvScale");
@@ -812,6 +844,7 @@ export function initialize(gl){
     tempShotMatrix = new Float32Array(16);
     tempEnemyMatrix = new Float32Array(16);
     explosionMatrix = new Float32Array(16);
+    bgMatrix = new Float32Array(16);
 
     // --- SETUP DAS TEXTURAS ---
     const texture = gl.createTexture();
@@ -961,6 +994,29 @@ export function initialize(gl){
         console.error('Falha ao carregar explosion.png. Verifique se o nome e o formato estão corretos na sua pasta.');
     }
     imgExplosion.src = './assets/explosion.png';
+
+    const texBackground = gl.createTexture();
+    scene.textureBackground = texBackground;
+    gl.bindTexture(gl.TEXTURE_2D, texBackground);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    const imgBackground = new Image();
+    imgBackground.onload = () => {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texBackground);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgBackground);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        console.log("Textura de fundo carregada com sucesso.");
+    }
+    imgBackground.onerror = () => {
+        console.error('Falha ao carregar Fundo.png. Verifique se o nome e o formato estão corretos na sua pasta.');
+    }
+    imgBackground.src = './assets/Fundo.png';
+
+
 }
 
 function ortho(left, right, bottom, top, near, far) {
@@ -987,15 +1043,29 @@ export function render(gl) {
         makeEnemiesShoot();
         checkEnemyShootCollision();
         checkWinCondition();
+        bgOffsetY -= 0.002;
+        if(bgOffsetY <= -1) bgOffsetY = 1;
     }
-    gl.clear(gl.COLOR_BUFFER_BIT);
     //Limpa a Tela
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindVertexArray(scene.universalVao);
+    
+    //--- RENDERIZAÇÃO DO FUNDO ---
+    gl.uniform1i(u_PointLocation, 0);
+    gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
+    gl.uniform2f(u_uvOffsetLocation, 0.0, bgOffsetY);
+    mat4.identity(bgMatrix);
+    translate(bgMatrix,100, 100, 0);
+    mat4.scale(bgMatrix, bgMatrix, [200, 200, 1]);
+    gl.uniformMatrix4fv(u_modelMatrixLocation, false, bgMatrix);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, scene.textureBackground);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
     //--- RENDERIZAÇÃO DA NAVE ---
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
     gl.uniform1i(u_PointLocation, 0); 
-    gl.bindVertexArray(scene.universalVao);
     // Configura a matriz de modelo da nave combinando Translação e Escala
     mat4.identity(shipMatrix);
     translate(shipMatrix,scene.shipX, scene.shipY, 0);
@@ -1010,6 +1080,7 @@ export function render(gl) {
     gl.uniform1i(u_PointLocation, 1);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
+    gl.uniform4f(u_colorLocation, 1.0, 1.0, 0.0, 1.0);
     for (let shoot of shoots){
         mat4.identity(tempShotMatrix);
         translate(tempShotMatrix,shoot.x, shoot.y, 0);
@@ -1110,6 +1181,7 @@ export function render(gl) {
     gl.uniform1i(u_PointLocation, 1);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
+    gl.uniform4f(u_colorLocation, 1.0, 0.0, 0.0, 1.0);
     for (let shoot of enemyShoots){
         mat4.identity(tempShotMatrix);
         translate(tempShotMatrix,shoot.x, shoot.y, 0);
