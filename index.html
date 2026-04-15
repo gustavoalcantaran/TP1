@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Galaxian x Batman</title>
+        <link rel="stylesheet" href="estilos.css">
+        <script src="../utils/code/errors.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/3.4.2/gl-matrix-min.js"></script>
+    </head>
+    <body>
+        <div id="game-header">
+            <img src = "./assets/LogoGalaxian.png" alt = "Galaxian" class = "logo">
+            <span class ="versus">x</span>
+            <img src = "./assets/LogoBatman.png" alt = "Batman" class = "logo">
+        </div>
+        <div class="canvas-container">
+            <canvas class = "example-canvas shadow" width = "500" height = "500" style = "border: 1px solid #000;"></canvas>
+            <div id = "score-ui">Score: 0</div>
+            <div id="menu-pausa">
+                <h2>JOGO PAUSADO</h2>
+                <button id="btn-continuar">Continuar (ESC)</button>
+                <button id="btn-reiniciar">Reiniciar Jogo (R)</button>
+                <button id="btn-controles">Controles</button>
+                <button id="btn-configuracoes">Configurações (C)</button>
+            </div>
+            <div id="menu-start">
+                <h2>GALAXIAN - BATMAN VERSION</h2>
+                <p id="best-score">Sua melhor pontuação: 0</p>
+                <button id="btn-start">Começar Jogo</button>
+                <button id="btn-controles-start">Controles</button>
+                <button id="btn-configuracoes-start">Configurações (C)</button>
+            </div>
+            <div id="menu-configuracoes">
+                <h2>CONFIGURAÇÕES</h2>
+                <label for="volume">Volume:</label>
+                <input type="range" id="volume" name="volume" min="0" max="1" step="0.1" value="0.5">
+                <button id="btn-voltar1">Voltar</button>
+            </div>
+            <div id="menu-controles">
+                    <h2>CONTROLES</h2>
+                    <ul id="lista-controles">
+                        <li><span class="tecla">W A S D</span> ou <span class="tecla">SETAS</span> - Movimentação</li>
+                        <li><span class="tecla">ESPAÇO</span> - Atirar</li>
+                        <li><span class="tecla">ESC</span> - Pausar Jogo</li>
+                        <li><span class="tecla">C</span> - Configurações</li>
+                        <li><span class="tecla">R</span> - Reiniciar Jogo</li>
+                    </ul>
+                    <button id="btn-voltar">Voltar</button>
+            </div>
+            <div id="menu-vitoria">
+                <h2>VITÓRIA</h2>
+                <p id="vitoria-score">Sua pontuação: 0</p>
+                <button id="btn-continuar-vitoria">Continuar</button>
+            </div>
+            <div id="menu-game-over">
+                <h2>GAME OVER</h2>
+                <p id="gameover-score">Sua pontuação: 0</p>
+                <button id="btn-reiniciar-game-over">Reiniciar Jogo</button>
+            </div>
+        </div>
+        <script type = "shader/vertex">
+            #version 300 es
+
+            in vec3 a_position;
+            in vec2 a_texCoord;
+
+            uniform mat4 projection;
+            uniform mat4 model;
+            
+            uniform vec2 u_uvOffset;
+            uniform vec2 u_uvScale;
+            out vec2 v_texCoord;
+
+            void main() {
+                gl_Position = projection * model * vec4(a_position, 1.0);
+                v_texCoord = (a_texCoord * u_uvScale) + u_uvOffset;
+            }
+        </script>
+        <script type = "shader/fragment">
+            #version 300 es
+            precision mediump float;
+
+            in vec2 v_texCoord;
+            uniform sampler2D u_texture;
+            uniform bool u_isPoint;
+
+            out vec4 outColor;
+            void main(){
+                if (u_isPoint) {
+                    outColor = vec4(0.0, 1.0, 0.0, 1.0); // Tiro e inimigos sem textura
+                } else {
+                outColor = texture(u_texture, v_texCoord); // Nave com textura
+                }
+            }
+        </script>
+        <script type = "module">
+            import {setupWebGL, initialize, render} from "./main.js";
+            const gl = setupWebGL();
+            initialize(gl);
+            render(gl);
+        </script>
+    </body>
+</html>

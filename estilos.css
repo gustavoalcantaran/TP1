@@ -1,0 +1,237 @@
+﻿body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #111;
+    color: white;
+    font-family: sans-serif;
+    overflow: hidden;
+}
+#game-header{
+    width: 200px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin: 0 auto;
+    padding-bottom:20px;
+    background-color:transparent;
+}
+.logo{
+    height:30px;
+    width: auto;
+    object-fit: contain;
+}
+.versus {
+    font-family: Arial, sans-serif;
+    font-size: 20px;
+    font-weight: bold;
+    color: yellow;
+}
+.title {
+    margin: 0;
+    padding: 10px;
+}
+button {
+    width : 220px;
+    font-size : 20px;
+    padding : 10px 20px;
+    margin : 10px;
+    border : 2px solid rgb(255, 255, 0);
+    border-radius : 5px;
+    background-color : yellow;
+    color : black;
+    cursor : pointer;
+    transition : background-color 0.3s ease;
+}
+button:hover {
+    background-color : rgb(255, 200, 0);
+    color:black;
+}
+.canvas-container {
+    position: relative;
+    display: inline-block;
+}
+
+.example-canvas {
+    width: 85vmin;
+    height: 85vmin;
+    background-color: #000;
+    box-shadow: 0 0 20px rgba(0, 150, 255, 0.3);
+    display : block;
+}
+#score-ui {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    font-size: 24px;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    z-index : 10;
+    color: rgb(238, 255, 0);
+    pointer-events : none;
+    text-shadow: 2px 2px 5px rgba(0,0,0,1);
+}
+#menu-pausa {
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-color: rgba(0,0,0,0.7);
+
+    display : none;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
+
+#menu-pausa h2 {
+    font-size : 40px;
+    margin-bottom : 20px;
+    text-shadow: 2px 2px 5px rgb(255, 255, 0);
+}
+#menu-configuracoes {
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-color: rgba(0,0,0,0.7);
+
+    display : none;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
+#menu-configuracoes h2 {
+    font-size : 40px;
+    margin-bottom : 20px;
+    text-shadow: 2px 2px 5px rgb(255, 255, 0);
+}
+#menu-controles {
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-color: rgba(0,0,0,0.7);
+
+    display : none;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
+
+#menu-configuracoes.from-start,
+#menu-controles.from-start {
+    background-color: transparent;
+    background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("./assets/menu-start.jpg");
+    background-size: cover;
+    background-position: center;
+}
+
+#menu-controles h2 {
+    font-size : 40px;
+    margin-bottom : 20px;
+    text-shadow: 2px 2px 5px rgb(255, 255, 0);
+}
+#lista-controles {
+    list-style : none;
+    padding : 0;
+    margin-bottom : 40px;
+    font-size : 20px;
+    line-height : 2.5;
+}
+.tecla{
+    background-color: #333;
+    color : white;
+    padding : 5px 10px;
+    border : 2px solid #555;
+    border-radius : 5px;
+    border-bottom : 4px solid #222;
+    font-weight: bold;
+    margin-right : 10px;
+}
+#menu-configuracoes label {
+    font-size : 20px;
+    margin-bottom : 10px;
+}
+#menu-configuracoes input[type="range"] {
+    width : 200px;
+    margin-bottom : 20px;
+}
+#menu-game-over {
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-color: rgba(0,0,0,0.7);
+
+    display : none;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
+#menu-game-over h2 {
+    font-size : 40px;
+    margin-bottom : 20px;
+    text-shadow: 2px 2px 5px rgb(255, 0, 0);
+}
+#menu-start{
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-image: url("./assets/menu-start.jpg");
+    background-size: cover;
+    background-position: center;   
+     
+    display : flex;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
+#menu-vitoria {
+    position : absolute;
+    top : 0;
+    left : 0;
+    width : 100%;
+    height : 100%;
+    z-index : 20;
+
+    background-color: rgba(0,0,0,0.7);
+
+    display : none;
+    flex-direction : column;
+    align-items : center;
+    justify-content : center;
+    color : white;
+    font-family : 'Courier New', Courier, monospace;
+}
