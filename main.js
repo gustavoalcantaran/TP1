@@ -294,10 +294,10 @@ function checkPlayerShootCollision(shoot, enemy){
     return distanceSquare < radiusSumSquare;
 }
 
-function enemyExplosion(enemy){
+function renderExplosion(ship){
     explosions.push({
-        x: enemy.x,
-        y: enemy.y,
+        x: ship.x,
+        y: ship.y,
         startTime: performance.now(),
     });
 }
@@ -315,7 +315,7 @@ function updateCollisionEnemies() {
                 scoreElement.innerText = `Score: ${score}`;
                 checkBestScore();
                 SFX.playExplosion(masterVolume);
-                enemyExplosion(enemy);
+                renderExplosion(enemy);
                 enemiesAlive--;
                 break; // Para de checar outros enemies para esse tiro
             }
@@ -494,6 +494,7 @@ function checkEnemyShootCollision(){
             i--;
         }
         if (life <= 0) {
+            renderExplosion({ x: scene.shipX, y: scene.shipY });
             gameOver();
         }
     }
@@ -1063,18 +1064,20 @@ export function render(gl) {
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
     //--- RENDERIZAÇÃO DA NAVE ---
-    gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
-    gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
-    gl.uniform1i(u_PointLocation, 0); 
-    // Configura a matriz de modelo da nave combinando Translação e Escala
-    mat4.identity(shipMatrix);
-    translate(shipMatrix,scene.shipX, scene.shipY, 0);
-    mat4.scale(shipMatrix, shipMatrix, [32, 18, 1]);
-    // Passa a matriz correta (com tamanho e posição) para o vertex shader
-    gl.uniformMatrix4fv(u_modelMatrixLocation, false, shipMatrix);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, scene.texture);
-    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    if (life > 0) {
+        gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
+        gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
+        gl.uniform1i(u_PointLocation, 0); 
+        // Configura a matriz de modelo da nave combinando Translação e Escala
+        mat4.identity(shipMatrix);
+        translate(shipMatrix,scene.shipX, scene.shipY, 0);
+        mat4.scale(shipMatrix, shipMatrix, [32, 18, 1]);
+        // Passa a matriz correta (com tamanho e posição) para o vertex shader
+        gl.uniformMatrix4fv(u_modelMatrixLocation, false, shipMatrix);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, scene.texture);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    }
     
     //--- RENDERIZAÇÃO DOS TIROS ---
     gl.uniform1i(u_PointLocation, 1);
