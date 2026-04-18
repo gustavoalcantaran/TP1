@@ -631,15 +631,13 @@ function keyboardHandler(){
         lastShootTime = currentTime;
         SFX.playShoot(masterVolume);
     }
-    if (keys.r && !gamePaused){
+    if (keys.r){
         keys.r = false; // Consumimos a tecla para não rodar várias vezes por segundo
         resetGame();
-        if (gamePaused) {
-            gamePaused = false;
-            settingsMenu.style.display = 'none';
-            pauseMenu.style.display = 'none';
-        }
-        
+        gamePaused = false;
+        settingsMenu.style.display = 'none';
+        pauseMenu.style.display = 'none';
+
     }
     if (keys.esc) {
         keys.esc = false; // Consumimos a tecla
@@ -1017,6 +1015,28 @@ export function initialize(gl){
     }
     imgBackground.src = './assets/Fundo.png';
 
+    const texLife = gl.createTexture();
+    scene.textureLife = texLife;
+    gl.bindTexture(gl.TEXTURE_2D, texLife);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const imgLife = new Image();
+    imgLife.onload = () => {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texLife);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgLife);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        console.log("Textura de vida carregada com sucesso.");
+    }
+    imgLife.onerror = () => {
+        console.error('Falha ao carregar life.png. Verifique se o nome e o formato estão corretos na sua pasta.');
+    }
+    imgLife.src = './assets/life.png';
+
 
 }
 
@@ -1047,6 +1067,7 @@ export function render(gl) {
         bgOffsetY -= 0.002;
         if(bgOffsetY <= -1) bgOffsetY = 1;
     }
+
     //Limpa a Tela
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindVertexArray(scene.universalVao);
@@ -1064,14 +1085,23 @@ export function render(gl) {
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
     //--- RENDERIZAÇÃO DA NAVE ---
+    gl.uniform2f(u_uvScaleLocation, 1/4, 1.0);
+    gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
     if (life > 0) {
-        gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
-        gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
+        if(keys.w || keys.a && keys.d){
+            gl.uniform2f(u_uvOffsetLocation, 0, 0.0);
+        }else if (keys.a){
+            gl.uniform2f(u_uvOffsetLocation, 2/4, 0.0);
+        }else if (keys.d){
+            gl.uniform2f(u_uvOffsetLocation, 1/4, 0.0);
+        }else if (keys.s){
+            gl.uniform2f(u_uvOffsetLocation, 3/4, 0.0);
+        }
         gl.uniform1i(u_PointLocation, 0); 
         // Configura a matriz de modelo da nave combinando Translação e Escala
         mat4.identity(shipMatrix);
         translate(shipMatrix,scene.shipX, scene.shipY, 0);
-        mat4.scale(shipMatrix, shipMatrix, [32, 18, 1]);
+        mat4.scale(shipMatrix, shipMatrix, [33, 33, 1]);
         // Passa a matriz correta (com tamanho e posição) para o vertex shader
         gl.uniformMatrix4fv(u_modelMatrixLocation, false, shipMatrix);
         gl.activeTexture(gl.TEXTURE0);
@@ -1202,10 +1232,10 @@ export function render(gl) {
         for (let i = 0; i < life; i++){
         mat4.identity(shipMatrix);
         translate(shipMatrix, 10 + i*12, 10, 0);
-        mat4.scale(shipMatrix, shipMatrix, [10, 6, 1]);
+        mat4.scale(shipMatrix, shipMatrix, [11, 11, 1]);
         gl.uniformMatrix4fv(u_modelMatrixLocation, false, shipMatrix);
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, scene.texture);
+        gl.bindTexture(gl.TEXTURE_2D, scene.textureLife);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
     }
 
