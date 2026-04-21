@@ -117,6 +117,12 @@ const enemyTemplate = {
     returning : false,
     lastShootTime : 0,
 };
+
+const perks = [];
+
+let speedPerk = 0;
+let shootPerk = 0;
+
 let enemies = [];
 
 const explosions = [];
@@ -183,6 +189,9 @@ const gameOverScoreElement = document.getElementById('gameover-score');
 const vitoriaMenu = document.getElementById('menu-vitoria');
 const vitoriaScoreElement = document.getElementById('vitoria-score');
 const BtnVitoriaContinue = document.getElementById('btn-continuar-vitoria');
+const menuConfirmRestart = document.getElementById('menu-confirmacao-reinicio');
+const btnConfirmRestart = document.getElementById('btn-confirmar-reinicio');
+const btnCancelRestart = document.getElementById('btn-cancelar-reinicio');
 let menuOrigin = null;
 
 function updateMenuBackgroundByOrigin(menuElement) {
@@ -299,6 +308,27 @@ function renderExplosion(ship){
         x: ship.x,
         y: ship.y,
         startTime: performance.now(),
+    });
+}
+
+function dropPerks(enemy){
+    if (enemy.type < 3 && Math.random() > 0.2) return;
+    const perksToDrop = [];
+    if (shootPerk < rounds+2){
+        perksToDrop.push('shoot');
+    }
+    if (speedPerk < rounds+2){
+        perksToDrop.push('speed');
+    }
+    perksToDrop.push('slow');
+    const chance = Math.random();
+    const selected = Math.floor(chance * perksToDrop.length);
+    const perkType = perksToDrop[selected];
+    perks.push({
+        x: enemy.x,
+        y: enemy.y,
+        type: perkType,
+        speed: 0.3,
     });
 }
 
@@ -512,10 +542,21 @@ btnContinue.addEventListener('click', () => {
 });
 
 btnRestart.addEventListener('click', () => {
+    pauseMenu.style.display = 'none';
+    menuConfirmRestart.style.display = 'flex';
+});
+
+btnConfirmRestart.addEventListener('click', () => {
     resetGame();
     gamePaused = false;
     settingsMenu.style.display = 'none';
     pauseMenu.style.display = 'none';
+    menuConfirmRestart.style.display = 'none';
+});
+
+btnCancelRestart.addEventListener('click', () => {
+    menuConfirmRestart.style.display = 'none';
+    pauseMenu.style.display = 'flex';
 });
 
 btnSettings.addEventListener('click', () => {
@@ -601,12 +642,14 @@ function resetGame(){
 }
 
 function keyboardHandler(){
-    if (vitoriaMenu.style.display === 'flex' || gameoverMenu.style.display === 'flex' || startMenu.style.display === 'flex') {
+    const isMenuVisible = vitoriaMenu.style.display === 'flex' || 
+                          gameoverMenu.style.display === 'flex' || 
+                          getComputedStyle(startMenu).display === 'flex' || 
+                          menuConfirmRestart.style.display === 'flex';
+    
+    if (isMenuVisible) {
         return;
     }
-    // Como a minha nave tem 16 de largura para um lado e 16 para o outro, coloquei que
-    // O eixo x tem que ser maior que 16 para não sair da tela, e menor que 184 (200 - 16) 
-    // para o mesmo motivo. O mesmo raciocínio para o eixo y, mas com 9 de largura para cada lado.
     if (keys.w && scene.shipY < 191 && !gamePaused){
             scene.shipY += 0.5;
     }
@@ -632,12 +675,10 @@ function keyboardHandler(){
         SFX.playShoot(masterVolume);
     }
     if (keys.r){
-        keys.r = false; // Consumimos a tecla para não rodar várias vezes por segundo
-        resetGame();
-        gamePaused = false;
+        gamePaused = true;
         settingsMenu.style.display = 'none';
         pauseMenu.style.display = 'none';
-
+        menuConfirmRestart.style.display = 'flex';
     }
     if (keys.esc) {
         keys.esc = false; // Consumimos a tecla
@@ -1037,7 +1078,27 @@ export function initialize(gl){
     }
     imgLife.src = './assets/life.png';
 
+    const texPerks = gl.createTexture();
+    scene.texturePerks = texPerks;
+    gl.bindTexture(gl.TEXTURE_2D, texPerks);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    const imgPerks = new Image();
+    imgPerks.onload = () => {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texPerks);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgPerks);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        console.log("Textura de perks carregada com sucesso.");
+    }
+    imgPerks.onerror = () => {
+        console.error('Falha ao carregar perks.png. Verifique se o nome e o formato estão corretos na sua pasta.');
+    }
+    imgPerks.src = './assets/perks.png';
 }
 
 function ortho(left, right, bottom, top, near, far) {
