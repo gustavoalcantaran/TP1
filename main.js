@@ -7,10 +7,10 @@ const volumeControl = document.getElementById('volume');
 let masterVolume = 0.5;
 const backgroundAudio = new Audio('Soundtrack.mp3');
 backgroundAudio.loop = true;
-backgroundAudio.volume = 0.5*masterVolume;
+backgroundAudio.volume = 0.5 * masterVolume;
 const gameOverAudio = new Audio('Gameover.mp3');
 gameOverAudio.loop = true;
-gameOverAudio.volume = 0.5*masterVolume;
+gameOverAudio.volume = 0.5 * masterVolume;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const SFX = {
     playShoot : function(volume = 0.5){
@@ -88,6 +88,8 @@ let u_modelMatrixLocation;
 let shipMatrix;
 let tempShotMatrix;
 let tempEnemyMatrix;
+let tempLifeMatrix;
+let tempPerkMatrix;
 
 //Variável para controle de textura ou cor
 let u_PointLocation;
@@ -118,10 +120,13 @@ const enemyTemplate = {
     lastShootTime : 0,
 };
 
+//Variáveis para controle de perks
 const perks = [];
-
 let speedPerk = 0;
 let shootPerk = 0;
+let speedPerkDropping = 0;
+let shootPerkDropping = 0;
+let slowPerkTime = 0;
 
 let enemies = [];
 
@@ -314,22 +319,65 @@ function renderExplosion(ship){
 function dropPerks(enemy){
     if (enemy.type < 3 && Math.random() > 0.2) return;
     const perksToDrop = [];
-    if (shootPerk < rounds+2){
+    if (shootPerkDropping === 0 && shootPerk < rounds+2){
         perksToDrop.push('shoot');
     }
-    if (speedPerk < rounds+2){
+    if (speedPerkDropping === 0 && speedPerk < rounds+2){
         perksToDrop.push('speed');
     }
     perksToDrop.push('slow');
     const chance = Math.random();
     const selected = Math.floor(chance * perksToDrop.length);
     const perkType = perksToDrop[selected];
+    if (perkType === 'shoot') {
+        shootPerkDropping = 1;
+    } else if (perkType === 'speed') {
+        speedPerkDropping = 1;
+    }
     perks.push({
         x: enemy.x,
         y: enemy.y,
         type: perkType,
         speed: 0.3,
     });
+}
+
+function movePerks(){
+    for (let i = 0; i < perks.length; i++) {
+        perks[i].y -= perks[i].speed;
+        if (perks[i].y < 0) {
+            if (perks[i].type === 'shoot') {
+                shootPerkDropping = 0;
+            }
+            else if (perks[i].type === 'speed') {
+                speedPerkDropping = 0;
+            }
+            perks.splice(i, 1);
+            i--;
+        }
+    }
+}
+
+function collectPerks(){
+    for (let i = 0; i < perks.length; i++) {
+        const distX = perks[i].x - scene.shipX;
+        const distY = perks[i].y - scene.shipY;
+        const distanceSquare = distX * distX + distY * distY;
+        if (distanceSquare < 462.25){
+            if (perks[i].type === 'shoot') {
+                shootPerkDropping = 0;
+                shootPerk++;
+            }
+            else if (perks[i].type === 'speed') {
+                speedPerkDropping = 0;
+                speedPerk++;
+            }
+            else if (perks[i].type === 'slow') {
+                slowPerkTime = performance.now();
+            }
+            perks.splice(i, 1);
+        }
+    }
 }
 
 function updateCollisionEnemies() {
@@ -343,7 +391,7 @@ function updateCollisionEnemies() {
                 shotHit = true;
                 score += enemy.points * (rounds*0.5); // Incrementa a pontuação
                 scoreElement.innerText = `Score: ${score}`;
-                checkBestScore();
+                dropPerks(enemy);
                 SFX.playExplosion(masterVolume);
                 renderExplosion(enemy);
                 enemiesAlive--;
@@ -358,14 +406,16 @@ function updateCollisionEnemies() {
 }
 
 function moveEnemies(){
+    const slowActive = slowPerkTime !== 0 && (performance.now() - slowPerkTime < 2000);
+    const enemyMoveFactor = slowActive ? 0.5 : 1;
     let hittedwall = false;
     for (let enemy of enemies){
         if (!enemy.active) continue;
-        if(enemy.pback[0] + (0.2*(rounds)*enemy.dir) > 190 || enemy.pback[0] + (0.2*(rounds)*enemy.dir) < 10){
+        if (enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir) > 190 || enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir) < 10) {
             hittedwall = true;
             break;
         }
-        if(enemy.pback[1] < 16){
+        if (enemy.pback[1] < 16) {
             gameOver();
         }
     }
@@ -375,32 +425,31 @@ function moveEnemies(){
         let movX = 0;
         let movY = 0;
 
-        if(hittedwall){
-            movY -= 10;
+        if (hittedwall) {
+            movY -= 10 * enemyMoveFactor;
             enemy.dir *= -1;
         } else {
-            movX += 0.15*(rounds)*enemy.dir;
+            movX += 0.15 * rounds * enemyMoveFactor * enemy.dir;
         }
         
         enemy.pback[0] += movX;
         enemy.pback[1] += movY;
 
         if (enemy.attacking) {
-            enemy.t += 0.005;
-            if(enemy.t >= 1){
+            enemy.t += 0.005 * enemyMoveFactor;
+            if (enemy.t >= 1) {
                 startReturning(enemy);
             } else {
                 const pos = calcBezier(enemy.p0, enemy.p1, enemy.p2, enemy.p3, enemy.t);
                 enemy.x = pos[0];
                 enemy.y = pos[1];
             }
-        }
-        else if(enemy.returning){
+        } else if (enemy.returning) {
             enemy.p3 = [enemy.pback[0], enemy.pback[1]];
 
-            enemy.t += 0.005;
+            enemy.t += 0.005 * enemyMoveFactor;
 
-            if(enemy.t >= 1){
+            if (enemy.t >= 1) {
                 enemy.returning = false;
                 enemy.x = enemy.pback[0];
                 enemy.y = enemy.pback[1];
@@ -409,7 +458,7 @@ function moveEnemies(){
                 enemy.x = pos[0];
                 enemy.y = pos[1];
             }
-        }else {
+        } else {
             enemy.x = enemy.pback[0];
             enemy.y = enemy.pback[1];
         }
@@ -472,7 +521,7 @@ function startReturning(enemy){
 
 function enemyShoot(enemy,targetX,targetY){
     const currentTime = performance.now();
-    if (currentTime - enemy.lastShootTime < 700*(2/rounds)) return;
+    if (currentTime - enemy.lastShootTime < 700 * (2 / rounds)) return;
     enemy.lastShootTime = currentTime;
     const distX = targetX - enemy.x;
     const distY = targetY - enemy.y;
@@ -534,6 +583,7 @@ let gamePaused = true;
 volumeControl.addEventListener('input', (event) => {
     masterVolume = event.target.value;
     backgroundAudio.volume = masterVolume * 0.5;
+    gameOverAudio.volume = masterVolume * 0.5;
 });
 
 btnContinue.addEventListener('click', () => {
@@ -628,6 +678,12 @@ BtnVitoriaContinue.addEventListener('click', () => {
 });
 
 function resetGame(){
+    perks.length = 0;
+    shootPerk = 0;
+    speedPerk = 0;
+    speedPerkDropping = 0;
+    shootPerkDropping = 0;
+    slowPerkTime = 0;
     rounds = 1;
     score = 0;
     life = 3;
@@ -651,19 +707,20 @@ function keyboardHandler(){
         return;
     }
     if (keys.w && scene.shipY < 191 && !gamePaused){
-            scene.shipY += 0.5;
+            scene.shipY += 0.5 + (0.1*speedPerk);
     }
     if (keys.s && scene.shipY > 9 && !gamePaused){
-            scene.shipY -= 0.5;
+            scene.shipY -= 0.5 + (0.1*speedPerk);
     }
     if (keys.a && scene.shipX > 16 && !gamePaused){
-            scene.shipX -= 0.5;
+            scene.shipX -= 0.5 + (0.1*speedPerk);
     }
     if (keys.d && scene.shipX < 184 && !gamePaused){
-            scene.shipX += 0.5;
+            scene.shipX += 0.5 + (0.1*speedPerk);
     }
     const currentTime = performance.now();
-    if (keys.space && (currentTime - lastShootTime > 500) && !gamePaused){
+    if (keys.space && (currentTime - lastShootTime > 500 - shootPerk * 50) && !gamePaused){
+        console.log(`Shoot Perk: ${shootPerk}`);
         const centroX = scene.shipX
         const topoY = scene.shipY + 5
         shoots.push({
@@ -885,6 +942,8 @@ export function initialize(gl){
     tempEnemyMatrix = new Float32Array(16);
     explosionMatrix = new Float32Array(16);
     bgMatrix = new Float32Array(16);
+    tempLifeMatrix = new Float32Array(16);
+    tempPerkMatrix = new Float32Array(16);
 
     // --- SETUP DAS TEXTURAS ---
     const texture = gl.createTexture();
@@ -1125,6 +1184,8 @@ export function render(gl) {
         makeEnemiesShoot();
         checkEnemyShootCollision();
         checkWinCondition();
+        collectPerks();
+        movePerks();
         bgOffsetY -= 0.002;
         if(bgOffsetY <= -1) bgOffsetY = 1;
     }
@@ -1290,15 +1351,40 @@ export function render(gl) {
     gl.uniform1i(u_PointLocation, 0);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
-        for (let i = 0; i < life; i++){
-        mat4.identity(shipMatrix);
-        translate(shipMatrix, 10 + i*12, 10, 0);
-        mat4.scale(shipMatrix, shipMatrix, [11, 11, 1]);
-        gl.uniformMatrix4fv(u_modelMatrixLocation, false, shipMatrix);
+    for (let i = 0; i < life; i++) {
+        mat4.identity(tempLifeMatrix);
+        translate(tempLifeMatrix, 10 + i * 12, 10, 0);
+        mat4.scale(tempLifeMatrix, tempLifeMatrix, [11, 11, 1]);
+        gl.uniformMatrix4fv(u_modelMatrixLocation, false, tempLifeMatrix);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, scene.textureLife);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
     }
 
+    //--- RENDERIZAÇÃO DOS PERKS ---
+    gl.uniform1i(u_PointLocation, 0);
+    gl.uniform2f(u_uvScaleLocation, 1 / 3, 1.0);
+    for (let perk of perks) {
+        mat4.identity(tempPerkMatrix);
+        translate(tempPerkMatrix, perk.x, perk.y, 0);
+        mat4.scale(tempPerkMatrix, tempPerkMatrix, [10, 10, 1]);
+        switch (perk.type) {
+            case 'shoot':
+                gl.uniform2f(u_uvOffsetLocation, 1 / 3, 0);
+                break;
+            case 'speed':
+                gl.uniform2f(u_uvOffsetLocation, 0, 0);
+                break;
+            case 'slow':
+                gl.uniform2f(u_uvOffsetLocation, 2 / 3, 0);
+                break;
+            default:
+                gl.uniform2f(u_uvOffsetLocation, 0, 0);
+        }
+        gl.uniformMatrix4fv(u_modelMatrixLocation, false, tempPerkMatrix);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, scene.texturePerks);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    }
     requestAnimationFrame(() => render(gl));
 }
