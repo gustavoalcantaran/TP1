@@ -1200,8 +1200,8 @@ export function render(gl, currentTime) {
         checkWinCondition();
         collectPerks();
         movePerks();
-        bgOffsetY -= 0.002 * frameScale;
-        if(bgOffsetY <= -1) bgOffsetY = 1;
+        bgOffsetY += 0.002 * frameScale;
+        if(bgOffsetY >= 1) bgOffsetY = -1;
     }
 
     //Limpa a Tela
