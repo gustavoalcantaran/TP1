@@ -98,6 +98,12 @@ let u_PointLocation;
 let u_uvOffsetLocation;
 let u_uvScaleLocation;
 
+//Correção para que consiga jogar em monitores com mais Hz
+let lastTime = 0;
+let deltaTime = 0;
+let frameScale = 1;
+const GAME_SPEED_MULTIPLIER = 1.8;
+
 const scene = {
     program: null,
     texture: null,
@@ -290,7 +296,7 @@ function gameOver(){
 
 function moveShots(){
     for (let i = 0; i < shoots.length; i++) {
-        shoots[i].y += shoots[i].speed;
+        shoots[i].y += shoots[i].speed * frameScale;
         if (shoots[i].y > 200) {
             shoots.splice(i, 1);
             i--;
@@ -344,7 +350,7 @@ function dropPerks(enemy){
 
 function movePerks(){
     for (let i = 0; i < perks.length; i++) {
-        perks[i].y -= perks[i].speed;
+        perks[i].y -= perks[i].speed * frameScale;
         if (perks[i].y < 0) {
             if (perks[i].type === 'shoot') {
                 shootPerkDropping = 0;
@@ -411,7 +417,7 @@ function moveEnemies(){
     let hittedwall = false;
     for (let enemy of enemies){
         if (!enemy.active) continue;
-        if (enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir) > 190 || enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir) < 10) {
+        if (enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir * frameScale) > 190 || enemy.pback[0] + (0.2 * rounds * enemyMoveFactor * enemy.dir * frameScale) < 10) {
             hittedwall = true;
             break;
         }
@@ -426,17 +432,17 @@ function moveEnemies(){
         let movY = 0;
 
         if (hittedwall) {
-            movY -= 10 * enemyMoveFactor;
+            movY -= 10 * enemyMoveFactor * frameScale;
             enemy.dir *= -1;
         } else {
-            movX += 0.15 * rounds * enemyMoveFactor * enemy.dir;
+            movX += 0.15 * rounds * enemyMoveFactor * enemy.dir * frameScale;
         }
         
         enemy.pback[0] += movX;
         enemy.pback[1] += movY;
 
         if (enemy.attacking) {
-            enemy.t += 0.005 * enemyMoveFactor;
+            enemy.t += 0.005 * enemyMoveFactor * frameScale;
             if (enemy.t >= 1) {
                 startReturning(enemy);
             } else {
@@ -447,7 +453,7 @@ function moveEnemies(){
         } else if (enemy.returning) {
             enemy.p3 = [enemy.pback[0], enemy.pback[1]];
 
-            enemy.t += 0.005 * enemyMoveFactor;
+            enemy.t += 0.005 * enemyMoveFactor * frameScale;
 
             if (enemy.t >= 1) {
                 enemy.returning = false;
@@ -547,8 +553,8 @@ function makeEnemiesShoot(){
 
 function moveEnemyShoots(){
     for (let i = 0; i < enemyShoots.length; i++) {
-        enemyShoots[i].x += enemyShoots[i].speedX;
-        enemyShoots[i].y += enemyShoots[i].speedY;
+        enemyShoots[i].x += enemyShoots[i].speedX * frameScale;
+        enemyShoots[i].y += enemyShoots[i].speedY * frameScale;
 
         if (enemyShoots[i].x < 0 
             || enemyShoots[i].x > 200 
@@ -698,6 +704,9 @@ function resetGame(){
 }
 
 function keyboardHandler(){
+    const speed = 30;
+    const movementStep = speed * deltaTime * GAME_SPEED_MULTIPLIER;
+    const speedBonus = 0.1 * speedPerk * frameScale;
     const isMenuVisible = vitoriaMenu.style.display === 'flex' || 
                           gameoverMenu.style.display === 'flex' || 
                           getComputedStyle(startMenu).display === 'flex' || 
@@ -707,20 +716,19 @@ function keyboardHandler(){
         return;
     }
     if (keys.w && scene.shipY < 191 && !gamePaused){
-            scene.shipY += 0.5 + (0.1*speedPerk);
+            scene.shipY += movementStep + speedBonus;
     }
     if (keys.s && scene.shipY > 9 && !gamePaused){
-            scene.shipY -= 0.5 + (0.1*speedPerk);
+            scene.shipY -= movementStep + speedBonus;
     }
     if (keys.a && scene.shipX > 16 && !gamePaused){
-            scene.shipX -= 0.5 + (0.1*speedPerk);
+            scene.shipX -= movementStep + speedBonus;
     }
     if (keys.d && scene.shipX < 184 && !gamePaused){
-            scene.shipX += 0.5 + (0.1*speedPerk);
+            scene.shipX += movementStep + speedBonus;
     }
     const currentTime = performance.now();
     if (keys.space && (currentTime - lastShootTime > 500 - shootPerk * 50) && !gamePaused){
-        console.log(`Shoot Perk: ${shootPerk}`);
         const centroX = scene.shipX
         const topoY = scene.shipY + 5
         shoots.push({
@@ -1172,7 +1180,13 @@ function ortho(left, right, bottom, top, near, far) {
   ]);
 }
 
-export function render(gl) {
+export function render(gl, currentTime) {
+
+    if (!currentTime) currentTime = performance.now();
+    deltaTime = lastTime === 0 ? 0 : (currentTime - lastTime) / 1000;
+    if (deltaTime > 0.1) deltaTime = 0.1;
+    frameScale = deltaTime * 60 * GAME_SPEED_MULTIPLIER;
+    lastTime = currentTime;
 
     keyboardHandler();
     if (!gamePaused) {
@@ -1186,7 +1200,7 @@ export function render(gl) {
         checkWinCondition();
         collectPerks();
         movePerks();
-        bgOffsetY -= 0.002;
+        bgOffsetY -= 0.002 * frameScale;
         if(bgOffsetY <= -1) bgOffsetY = 1;
     }
 
@@ -1252,7 +1266,7 @@ export function render(gl) {
         let texturaInimigo;
         mat4.identity(tempEnemyMatrix);
         translate(tempEnemyMatrix, enemy.x, enemy.y, 0);
-        let frameDuration, currentTime, frameIndex;
+        let frameDuration, currentTimeEnemy, frameIndex;
         switch(enemy.type){
             case 1:
                 texturaInimigo = scene.enemyTexture1;
@@ -1262,8 +1276,8 @@ export function render(gl) {
                     gl.uniform2f(u_uvOffsetLocation, 2/3, 0.0);
                 } else {
                     frameDuration = 500; // Duração de cada frame em ms
-                    currentTime = performance.now();
-                    frameIndex = Math.floor(currentTime / frameDuration) % 2; // Alterna entre 0 e 1
+                    currentTimeEnemy = performance.now();
+                    frameIndex = Math.floor(currentTimeEnemy / frameDuration) % 2; // Alterna entre 0 e 1
                     gl.uniform2f(u_uvScaleLocation, 1/3, 1.0);
                     gl.uniform2f(u_uvOffsetLocation, frameIndex/3, 0.0);
                 }
@@ -1276,8 +1290,8 @@ export function render(gl) {
                     gl.uniform2f(u_uvOffsetLocation, 2/3, 0.0);
                 } else {
                     frameDuration = 500; // Duração de cada frame em ms
-                    currentTime = performance.now();
-                    frameIndex = Math.floor(currentTime / frameDuration) % 2; // Alterna entre 0 e 1
+                    currentTimeEnemy = performance.now();
+                    frameIndex = Math.floor(currentTimeEnemy / frameDuration) % 2; // Alterna entre 0 e 1
                     gl.uniform2f(u_uvScaleLocation, 1/3, 1.0);
                     gl.uniform2f(u_uvOffsetLocation, frameIndex/3, 0.0);
                 }
@@ -1311,12 +1325,12 @@ export function render(gl) {
     //--- RENDERIZAÇÃO DAS EXPLOSÕES ---
     gl.uniform1i(u_PointLocation, 0);
     gl.bindTexture(gl.TEXTURE_2D, scene.textureExplosion);
-    const currentTime = performance.now();
+    const currentTimeExplosion = performance.now();
     const totalFrames = 7;
     const FrameDuration = 75;
     for (let i = 0; i < explosions.length; i++){
         const explosion = explosions[i];
-        const elapsedTime = currentTime - explosion.startTime;
+        const elapsedTime = currentTimeExplosion - explosion.startTime;
         const ActualFrame = Math.floor(elapsedTime / FrameDuration);
         if (ActualFrame >= totalFrames){
             explosions.splice(i, 1);
@@ -1386,5 +1400,5 @@ export function render(gl) {
         gl.bindTexture(gl.TEXTURE_2D, scene.texturePerks);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
     }
-    requestAnimationFrame(() => render(gl));
+    requestAnimationFrame((time) => render(gl,time));
 }
