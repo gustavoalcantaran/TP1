@@ -1,7 +1,9 @@
 import {createProgram, createShader} from "./gl-utils.js";
 const { mat4 } = glMatrix;
 
-
+/* ============================================
+   SISTEMA DE ÁUDIO
+   ============================================ */
 //Configuração e Criação dos Sons
 const volumeControl = document.getElementById('volume');
 let masterVolume = 0.5;
@@ -26,6 +28,26 @@ const SFX = {
         gainNode.connect(audioCtx.destination);
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 0.15);
+    },
+    playHit : function(volume = 0.5) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sawtooth';
+
+        // Som curto e mais agressivo para indicar dano no player
+        oscillator.frequency.setValueAtTime(320, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.18);
+
+        gainNode.gain.setValueAtTime(volume * 0.7, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.2);
     },
     playExplosion : function(volume = 0.5){
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -72,38 +94,28 @@ const SFX = {
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 1.0);
     },
-    
 }
-//Variáveis para o Fundo
+
+/* ============================================
+   VARIÁVEIS DE RENDERIZAÇÃO (UNIFORMS E MATRIZES)
+   ============================================ */
 let bgOffsetY = 0;
 let bgMatrix;
 
-//Color
-let u_colorLocation;
+let u_colorLocation;        // Cor dos objetos renderizados
+let u_modelMatrixLocation;  // Matriz de transformação
 
-//Model
-let u_modelMatrixLocation;
+let shipMatrix, tempShotMatrix, tempEnemyMatrix, tempLifeMatrix, tempPerkMatrix;
+let u_PointLocation;        // Flag para desenhar ponto colorido vs textura
+let u_uvOffsetLocation;     // Offset para animação de spritesheet
+let u_uvScaleLocation;      // Escala de UV para spritesheet
 
-// Variáveis para controle de player,enemies e tiros
-let shipMatrix;
-let tempShotMatrix;
-let tempEnemyMatrix;
-let tempLifeMatrix;
-let tempPerkMatrix;
+let lastTime = 0, deltaTime = 0, frameScale = 1;
+const GAME_SPEED_MULTIPLIER = 1.8;  // Controle de tempo para alta taxa de refresh
 
-//Variável para controle de textura ou cor
-let u_PointLocation;
-
-//Variável para controlar as texturas que tem animações
-let u_uvOffsetLocation;
-let u_uvScaleLocation;
-
-//Correção para que consiga jogar em monitores com mais Hz
-let lastTime = 0;
-let deltaTime = 0;
-let frameScale = 1;
-const GAME_SPEED_MULTIPLIER = 1.8;
-
+/* ============================================
+   ESTADO DO JOGO
+   ============================================ */
 const scene = {
     program: null,
     texture: null,
@@ -113,7 +125,7 @@ const scene = {
     shipY : 9,
 };
 
-//Template de enemies e vetor para guardar enemies.
+// Template base para criar novos inimigos
 const enemyTemplate = {
     x: 0,
     y: 0,
@@ -126,20 +138,21 @@ const enemyTemplate = {
     lastShootTime : 0,
 };
 
-//Variáveis para controle de perks
-const perks = [];
+/* ============================================
+   SISTEMAS: INIMIGOS, TIROS, PERKS, EXPLOSÕES
+   ============================================ */
+const perks = [];  // Itens que caem quando inimigos morrem
 let speedPerk = 0;
 let shootPerk = 0;
 let speedPerkDropping = 0;
 let shootPerkDropping = 0;
 let slowPerkTime = 0;
 
-let enemies = [];
-
-const explosions = [];
+let enemies = [];      // Lista de inimigos ativos
+const explosions = []; // Animações de explosão
 let explosionMatrix;
 
-const shoots = [];
+const shoots = [];     // Tiros do jogador
 let lastShootTime = 0;
 const shootTemplate = {
     x: 0,
@@ -147,40 +160,40 @@ const shootTemplate = {
     speed: 0.8,
 };
 
-const enemyShoots = [];
+const enemyShoots = [];  // Tiros dos inimigos
 const enemyShootTemplate = {
     x : 0,
     y : 0,
     speedX : 0.5,
     speedY : 0.5,
-}
-//Variáveis para controle de estado do jogo e menus
-let life = 3;
-let enemiesAlive = 0;
-let rounds = 1;
-//Score para mostrar na tela
+};
+
+/* ============================================
+   ESTADO DO JOGO E UI
+   ============================================ */
+let life = 3, enemiesAlive = 0, rounds = 1;
 const scoreElement = document.getElementById('score-ui');
-let score = 0;
+let score = 0;  // Pontuação atual
+
 const BestScoreElement = document.getElementById('best-score');
 let bestScore = 0;
+
+// Carregar melhor pontuação salva no localStorage
 const storedBestScore = localStorage.getItem('bestScore');
 if (storedBestScore !== null) {
     bestScore = parseInt(storedBestScore);
-}
-if (BestScoreElement){
-    BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
-}
-const keys = {
-    w : false,
-    a : false,
-    s : false,
-    d : false,
-    space : false,
-    esc : false,
-    r : false,
-    c : false,
+    if (BestScoreElement) BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
 }
 
+// Rastreamento de teclas pressionadas
+const keys = {
+    w : false, a : false, s : false, d : false,
+    space : false, esc : false, r : false, c : false,
+};
+
+/* ============================================
+   REFERÊNCIAS DOS MENUS
+   ============================================ */
 const pauseMenu = document.getElementById('menu-pausa');
 const btnContinue = document.getElementById('btn-continuar');
 const btnRestart = document.getElementById('btn-reiniciar');
@@ -203,22 +216,26 @@ const BtnVitoriaContinue = document.getElementById('btn-continuar-vitoria');
 const menuConfirmRestart = document.getElementById('menu-confirmacao-reinicio');
 const btnConfirmRestart = document.getElementById('btn-confirmar-reinicio');
 const btnCancelRestart = document.getElementById('btn-cancelar-reinicio');
-let menuOrigin = null;
+let menuOrigin = null;  // Rastreia de qual menu o usuário veio
 
+/* ============================================
+   FUNÇÕES DE MENU
+   ============================================ */
 function updateMenuBackgroundByOrigin(menuElement) {
     if (!menuElement) return;
     const fromStartMenu = menuOrigin === startMenu;
     menuElement.classList.toggle('from-start', fromStartMenu);
 }
 
-function startGame(){
+function startGame() {
     initEnemies();
     backgroundAudio.play();
     gamePaused = false;
     enemiesAlive = enemies.length;
 }
 
-function checkWinCondition(){
+// Verifica se o jogador eliminou todos os inimigos
+function checkWinCondition() {
     if(enemiesAlive <= 0){
         checkBestScore();
         vitoriaScoreElement.innerText = `Sua pontuação: ${score}`;
@@ -230,17 +247,17 @@ function checkWinCondition(){
     }
 }
 
-function checkBestScore(){
+// Atualiza melhor pontuação se a atual for maior
+function checkBestScore() {
     if (score > bestScore) {
         bestScore = score;
         localStorage.setItem('bestScore', bestScore);
-        if (BestScoreElement) {
-            BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
-        }
+        if (BestScoreElement) BestScoreElement.innerText = `Melhor Pontuação: ${bestScore}`;
     }
 }
 
-function initEnemies(){
+// Inicializa configuração padrão de inimigos (3 linhas de combatentes + 2 chefes)
+function initEnemies() {
     for (let i = 0; i < 6; i++){
         const enemy = {
             ...enemyTemplate,
@@ -284,7 +301,7 @@ function initEnemies(){
     }
 }
 
-function gameOver(){
+function gameOver() {
     checkBestScore();
     gamePaused = true;
     gameOverScoreElement.innerText = `Sua pontuação: ${score}`;
@@ -294,7 +311,10 @@ function gameOver(){
     gameOverAudio.play();
 }
 
-function moveShots(){
+/* ============================================
+   SISTEMAS DE MOVIMENTO E FÍSICA
+   ============================================ */
+function moveShots() {
     for (let i = 0; i < shoots.length; i++) {
         shoots[i].y += shoots[i].speed * frameScale;
         if (shoots[i].y > 200) {
@@ -304,17 +324,15 @@ function moveShots(){
     }
 }
 
-function checkPlayerShootCollision(shoot, enemy){
+// Verifica colisão entre tiro e inimigo usando distância (otimizado)
+function checkPlayerShootCollision(shoot, enemy) {
     const distX = shoot.x - enemy.x;
     const distY = shoot.y - enemy.y;
-    
     const distanceSquare = distX * distX + distY * distY;
-    const radiusSumSquare = 51.1225;
-    
-    return distanceSquare < radiusSumSquare;
+    return distanceSquare < 51.1225;  // Raio combinado pré-calculado
 }
 
-function renderExplosion(ship){
+function renderExplosion(ship) {
     explosions.push({
         x: ship.x,
         y: ship.y,
@@ -322,7 +340,8 @@ function renderExplosion(ship){
     });
 }
 
-function dropPerks(enemy){
+// Chance de soltar perk ao destruir inimigo (maiores têm mais chance)
+function dropPerks(enemy) {
     if (enemy.type < 3 && Math.random() > 0.2) return;
     const perksToDrop = [];
     if (shootPerkDropping === 0 && shootPerk < rounds+2){
@@ -348,9 +367,9 @@ function dropPerks(enemy){
     });
 }
 
-function movePerks(){
+function movePerks() {
     for (let i = 0; i < perks.length; i++) {
-        perks[i].y -= perks[i].speed * frameScale;
+        perks[i].y -= perks[i].speed * frameScale;  // Perks fluem para cima
         if (perks[i].y < 0) {
             if (perks[i].type === 'shoot') {
                 shootPerkDropping = 0;
@@ -364,7 +383,8 @@ function movePerks(){
     }
 }
 
-function collectPerks(){
+// Detecta colisão da nave com perks
+function collectPerks() {
     for (let i = 0; i < perks.length; i++) {
         const distX = perks[i].x - scene.shipX;
         const distY = perks[i].y - scene.shipY;
@@ -386,6 +406,7 @@ function collectPerks(){
     }
 }
 
+// Verifica colisão entre tiros do jogador e inimigos
 function updateCollisionEnemies() {
     for (let i = 0; i < shoots.length; i++) {
         const shoot = shoots[i];
@@ -411,9 +432,10 @@ function updateCollisionEnemies() {
     }
 }
 
-function moveEnemies(){
+// Movimenta inimigos em bloco e aplica lógica de ataque rasante
+function moveEnemies() {
     const slowActive = slowPerkTime !== 0 && (performance.now() - slowPerkTime < 2000);
-    const enemyMoveFactor = slowActive ? 0.5 : 1;
+    const enemyMoveFactor = slowActive ? 0.5 : 1;  // Reduz velocidade se perk ativo
     let hittedwall = false;
     for (let enemy of enemies){
         if (!enemy.active) continue;
@@ -421,7 +443,7 @@ function moveEnemies(){
             hittedwall = true;
             break;
         }
-        if (enemy.pback[1] < 16) {
+        if (enemy.pback[1] < 0) {
             gameOver();
         }
     }
@@ -473,7 +495,8 @@ function moveEnemies(){
 
 let lastEnemyAttackingTime = 0;
 
-function selectEnemyToAttack(){
+// Seleciona aleatoriamente um inimigo para fazer rasante (a cada 2 segundos)
+function selectEnemyToAttack() {
     const currentTime = performance.now();
     if (currentTime - lastEnemyAttackingTime < 2000) return; // Ataca a cada 2 segundos
     lastEnemyAttackingTime = currentTime;
@@ -487,24 +510,16 @@ function selectEnemyToAttack(){
     
 }
 
-function calcBezier(p0,p1,p2,p3,t){
-    const u = 1-t;
-    const tt = t*t;
-    const uu = u*u;
-    const uuu = uu * u;
-    const ttt = tt * t;
-    let x = (uuu * p0[0]) 
-    + (3 * uu * t * p1[0]) 
-    + (3 * u * tt * p2[0]) 
-    + (ttt * p3[0]);
-    let y = (uuu * p0[1]) 
-    + (3 * uu * t * p1[1]) 
-    + (3 * u * tt * p2[1]) 
-    + (ttt * p3[1]);
+// Curva de Bézier cúbica: interpola posição suave para ataque rasante
+function calcBezier(p0, p1, p2, p3, t) {
+    const u = 1 - t, tt = t * t, uu = u * u, uuu = uu * u, ttt = tt * t;
+    const x = uuu * p0[0] + 3 * uu * t * p1[0] + 3 * u * tt * p2[0] + ttt * p3[0];
+    const y = uuu * p0[1] + 3 * uu * t * p1[1] + 3 * u * tt * p2[1] + ttt * p3[1];
     return [x, y];
 }
 
-function startSkimming(enemy, targetX, targetY){
+// Inicia ataque rasante de um inimigo em direção ao jogador
+function startSkimming(enemy, targetX, targetY) {
     SFX.playDiveBomb(masterVolume);
     enemy.attacking = true;
     enemy.t = 0;
@@ -515,7 +530,8 @@ function startSkimming(enemy, targetX, targetY){
     enemy.p3 = [targetX, -20];
 }
 
-function startReturning(enemy){
+// Retorna inimigo à formação após rasante
+function startReturning(enemy) {
     enemy.attacking = false;
     enemy.returning = true;
     enemy.t = 0;
@@ -525,9 +541,10 @@ function startReturning(enemy){
     enemy.p3 = enemy.pback;
 }
 
-function enemyShoot(enemy,targetX,targetY){
+// Inimigos atiram em direção ao jogador com intervalo baseado na fase
+function enemyShoot(enemy, targetX, targetY) {
     const currentTime = performance.now();
-    if (currentTime - enemy.lastShootTime < 700 * (2 / rounds)) return;
+    if (currentTime - enemy.lastShootTime < 700 * (4 / rounds)) return;  // Cadência aumenta a cada fase
     enemy.lastShootTime = currentTime;
     const distX = targetX - enemy.x;
     const distY = targetY - enemy.y;
@@ -543,17 +560,18 @@ function enemyShoot(enemy,targetX,targetY){
     });
 }
 
-function makeEnemiesShoot(){
-    for (let enemy of enemies){
+function makeEnemiesShoot() {
+    // Inimigos em ataque rasante atiram em direção ao jogador
+    for (let enemy of enemies) {
         if (enemy.attacking && enemy.active) {
             enemyShoot(enemy, scene.shipX, scene.shipY);
         }
     }
 }
 
-function moveEnemyShoots(){
+function moveEnemyShoots() {
     for (let i = 0; i < enemyShoots.length; i++) {
-        enemyShoots[i].x += enemyShoots[i].speedX * frameScale;
+        enemyShoots[i].x += enemyShoots[i].speedX * frameScale;  // Tiros inimigos seguem trajetória calculada
         enemyShoots[i].y += enemyShoots[i].speedY * frameScale;
 
         if (enemyShoots[i].x < 0 
@@ -566,7 +584,8 @@ function moveEnemyShoots(){
     }
 }
 
-function checkEnemyShootCollision(){
+// Detecta colisão entre tiros inimigos e nave do jogador
+function checkEnemyShootCollision() {
     for (let i = 0; i < enemyShoots.length; i++) {
         const shoot = enemyShoots[i];
         const distX = shoot.x - scene.shipX;
@@ -574,6 +593,7 @@ function checkEnemyShootCollision(){
         const distanceSquare = distX * distX + distY * distY;
         const radiusSumSquare = 51.1225; // Raio da nave + raio do tiro (7.15^2)
         if (distanceSquare < radiusSumSquare) {
+            SFX.playHit(masterVolume);
             life--;
             enemyShoots.splice(i, 1);
             i--;
@@ -584,8 +604,12 @@ function checkEnemyShootCollision(){
         }
     }
 }
+
 let gamePaused = true;
 
+/* ============================================
+   ENTRADA DO USUÁRIO E EVENTOS DE TECLADO
+   ============================================ */
 volumeControl.addEventListener('input', (event) => {
     masterVolume = event.target.value;
     backgroundAudio.volume = masterVolume * 0.5;
@@ -683,7 +707,8 @@ BtnVitoriaContinue.addEventListener('click', () => {
     scene.shipY = 9;
 });
 
-function resetGame(){
+function resetGame() {
+    // Reseta todos os sistemas para início de novo jogo
     perks.length = 0;
     shootPerk = 0;
     speedPerk = 0;
@@ -703,15 +728,16 @@ function resetGame(){
     document.getElementById('score-ui').innerText = `Score: ${score}`;
 }
 
-function keyboardHandler(){
+function keyboardHandler() {
     const speed = 30;
     const movementStep = speed * deltaTime * GAME_SPEED_MULTIPLIER;
-    const speedBonus = 0.1 * speedPerk * frameScale;
+    const speedBonus = 0.1 * speedPerk * frameScale;  // Bônus de velocidade por perk
     const isMenuVisible = vitoriaMenu.style.display === 'flex' || 
                           gameoverMenu.style.display === 'flex' || 
                           getComputedStyle(startMenu).display === 'flex' || 
                           menuConfirmRestart.style.display === 'flex';
     
+    // Não permite movimento se algum menu estiver aberto
     if (isMenuVisible) {
         return;
     }
@@ -728,14 +754,10 @@ function keyboardHandler(){
             scene.shipX += movementStep + speedBonus;
     }
     const currentTime = performance.now();
-    if (keys.space && (currentTime - lastShootTime > 500 - shootPerk * 50) && !gamePaused){
-        const centroX = scene.shipX
-        const topoY = scene.shipY + 5
-        shoots.push({
-            x: centroX,
-            y: topoY,
-            speed: 0.8
-        });
+    if (keys.space && (currentTime - lastShootTime > 500 - shootPerk * 50) && !gamePaused) {
+        const centroX = scene.shipX;
+        const topoY = scene.shipY + 5;
+        shoots.push({ x: centroX, y: topoY, speed: 0.8 });  // Tiro sai do centro da nave
         lastShootTime = currentTime;
         SFX.playShoot(masterVolume);
     }
@@ -791,7 +813,8 @@ function keyboardHandler(){
     }
 }
 
-window.addEventListener('keydown', (event) =>{
+window.addEventListener('keydown', (event) => {
+    // Rastreia teclas pressionadas
     if ((event.key === ' ')){
         keys.space = true;
     }
@@ -818,7 +841,8 @@ window.addEventListener('keydown', (event) =>{
     }
 });
 
-window.addEventListener('keyup', (event) =>{
+window.addEventListener('keyup', (event) => {
+    // Rastreia teclas soltas
     if ((event.key === ' ')){
         keys.space = false;
     }
@@ -845,13 +869,16 @@ window.addEventListener('keyup', (event) =>{
     }
 });
 
-function translate(matrix,tx, ty, tz) {
+/* ============================================
+   MATRIZES E UTILITÁRIOS DE TRANSFORMAÇÃO
+   ============================================ */
+function translate(matrix, tx, ty, tz) {
     matrix[12] = tx;
     matrix[13] = ty;
     matrix[14] = tz;
 }
 
-function rotate(matrix, angle){
+function rotate(matrix, angle) {
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     matrix[0] = c;
@@ -860,7 +887,10 @@ function rotate(matrix, angle){
     matrix[5] = c;
 }
 
-export function setupWebGL(){
+/* ============================================
+   WEBGL SETUP E INICIALIZAÇÃO
+   ============================================ */
+export function setupWebGL() {
     const canvas = document.querySelector(".example-canvas");
     const gl = canvas.getContext("webgl2");
     if (!gl) {
@@ -871,8 +901,8 @@ export function setupWebGL(){
     return gl;
 }
 
-export function initialize(gl){
-    
+export function initialize(gl) {
+    // Carrega e compila shaders
     const vertexShaderSource = document.querySelector('script[type="shader/vertex"]').textContent;
     const fragmentShaderSource = document.querySelector('script[type="shader/fragment"]').textContent;
     
@@ -1169,38 +1199,40 @@ export function initialize(gl){
 }
 
 function ortho(left, right, bottom, top, near, far) {
-  const tx = -(right + left) / (right - left);
-  const ty = -(top + bottom) / (top - bottom);
-  const tz = -(far + near) / (far - near);
-  return new Float32Array([
-    2 / (right - left), 0, 0, 0,
-    0, 2 / (top - bottom), 0, 0,
-    0, 0, -2 / (far - near), 0,
-    tx, ty, tz, 1
-  ]);
+    // Matriz de projeção ortográfica (sem perspectiva)
+    const tx = -(right + left) / (right - left);
+    const ty = -(top + bottom) / (top - bottom);
+    const tz = -(far + near) / (far - near);
+    return new Float32Array([
+        2 / (right - left), 0, 0, 0,
+        0, 2 / (top - bottom), 0, 0,
+        0, 0, -2 / (far - near), 0,
+        tx, ty, tz, 1
+    ]);
 }
 
 export function render(gl, currentTime) {
-
+    // Cálculo de deltaTime para compatibilidade com diferentes taxa de refresh
     if (!currentTime) currentTime = performance.now();
     deltaTime = lastTime === 0 ? 0 : (currentTime - lastTime) / 1000;
-    if (deltaTime > 0.1) deltaTime = 0.1;
+    if (deltaTime > 0.1) deltaTime = 0.1;  // Cap deltaTime para evitar saltos grandes
     frameScale = deltaTime * 60 * GAME_SPEED_MULTIPLIER;
     lastTime = currentTime;
 
+    // Lógica do jogo rodando enquanto despausa
     keyboardHandler();
     if (!gamePaused) {
         moveShots();
-        updateCollisionEnemies();
-        moveEnemies();
+        updateCollisionEnemies();  // Verifica tiros do jogador colidindo com inimigos
+        moveEnemies();             // Move inimigos e seleciona quem ataca
         selectEnemyToAttack();
-        moveEnemyShoots();
-        makeEnemiesShoot();
-        checkEnemyShootCollision();
-        checkWinCondition();
-        collectPerks();
-        movePerks();
-        bgOffsetY += 0.002 * frameScale;
+        moveEnemyShoots();         // Move tiros inimigos
+        makeEnemiesShoot();        // Inimigos atacando atiram
+        checkEnemyShootCollision(); // Verifica dano ao jogador
+        checkWinCondition();       // Verifica vitória
+        collectPerks();            // Jogador coleta itens
+        movePerks();               // Perks fluem para cima
+        bgOffsetY += 0.002 * frameScale;  // Animação de fundo
         if(bgOffsetY >= 1) bgOffsetY = -1;
     }
 
@@ -1208,7 +1240,11 @@ export function render(gl, currentTime) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindVertexArray(scene.universalVao);
     
-    //--- RENDERIZAÇÃO DO FUNDO ---
+    /* ============================================
+       RENDERIZAÇÃO
+       ============================================ */
+    
+    /* ---- FUNDO ---- */
     gl.uniform1i(u_PointLocation, 0);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, bgOffsetY);
@@ -1221,9 +1257,10 @@ export function render(gl, currentTime) {
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
     //--- RENDERIZAÇÃO DA NAVE ---
-    gl.uniform2f(u_uvScaleLocation, 1/4, 1.0);
+    gl.uniform2f(u_uvScaleLocation, 1/4, 1.0);  // 4 frames (parado, esq, dir, baixo)
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
     if (life > 0) {
+        // Animação da nave conforme direção
         if(keys.w || keys.a && keys.d){
             gl.uniform2f(u_uvOffsetLocation, 0, 0.0);
         }else if (keys.a){
@@ -1246,6 +1283,7 @@ export function render(gl, currentTime) {
     }
     
     //--- RENDERIZAÇÃO DOS TIROS ---
+    // Tiros são retângulos amarelos
     gl.uniform1i(u_PointLocation, 1);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
@@ -1260,6 +1298,7 @@ export function render(gl, currentTime) {
     }
 
     //--- RENDERIZAÇÃO DOS INIMIGOS ---
+    // Cada tipo de inimigo tem sua textura e comportamento de animação
     gl.uniform1i(u_PointLocation, 0);
     for (let enemy of enemies){
         if (!enemy.active) continue;
@@ -1323,6 +1362,7 @@ export function render(gl, currentTime) {
     }
 
     //--- RENDERIZAÇÃO DAS EXPLOSÕES ---
+    // Animação de spritesheet com 7 frames
     gl.uniform1i(u_PointLocation, 0);
     gl.bindTexture(gl.TEXTURE_2D, scene.textureExplosion);
     const currentTimeExplosion = performance.now();
@@ -1347,6 +1387,7 @@ export function render(gl, currentTime) {
     }
 
     //--- RENDERIZAÇÃO DOS TIROS INIMIGOS ---
+    // Tiros vermelhos, rotacionados conforme direção
     gl.uniform1i(u_PointLocation, 1);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
@@ -1362,6 +1403,7 @@ export function render(gl, currentTime) {
     }
 
     //--- RENDERIZAÇÃO DO UI DE VIDA ---
+    // Mostra corações no canto superior esquerdo
     gl.uniform1i(u_PointLocation, 0);
     gl.uniform2f(u_uvScaleLocation, 1.0, 1.0);
     gl.uniform2f(u_uvOffsetLocation, 0.0, 0.0);
@@ -1376,6 +1418,7 @@ export function render(gl, currentTime) {
     }
 
     //--- RENDERIZAÇÃO DOS PERKS ---
+    // Itens com 3 variações conforme tipo (ataque, velocidade, lentidão)
     gl.uniform1i(u_PointLocation, 0);
     gl.uniform2f(u_uvScaleLocation, 1 / 3, 1.0);
     for (let perk of perks) {

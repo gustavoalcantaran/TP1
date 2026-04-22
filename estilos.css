@@ -89,11 +89,13 @@ button:hover {
 }
 
 .example-canvas {
-    width: 85vmin;
-    height: 85vmin;
+    width: 85vh;
+    height: 85vh;
+    aspect-ratio: 1/1;
     background-color: #000;
     box-shadow: 0 0 20px rgba(0, 150, 255, 0.3);
     display : block;
+    object-fit : contain;
 }
 #score-ui {
     position: absolute;
