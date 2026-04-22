@@ -6,7 +6,7 @@ Jogo estilo Galaxian desenvolvido para a disciplina de Computação Gráfica, us
 
 O jogador controla uma nave na parte inferior da tela e deve derrotar todos os inimigos para vencer a rodada. Os inimigos se movimentam em bloco, atiram contra o jogador e podem realizar ataque rasante em curva. Se a vida do jogador chegar a zero ou os inimigos avançarem demais, ocorre game over.
 
-## Autores
+## Autor
 
 - Nome : Gustavo Alcântara do Nascimento
 
@@ -28,6 +28,7 @@ O jogador controla uma nave na parte inferior da tela e deve derrotar todos os i
 - Esc: pausa/continua
 - R: solicita reinício (com confirmação in-game)
 - C: abre/fecha menu de configurações
+- F11 : Tela Cheia
 
 ## Regras principais implementadas
 
@@ -51,7 +52,7 @@ O jogador controla uma nave na parte inferior da tela e deve derrotar todos os i
 	- Explosão animada por spritesheet
 - Fundo com movimento vertical (scroll)
 - Rasante de inimigos com curva de Bézier
-- Tipos diferentes de inimigos (incluindo variantes maiores)
+- Tipos diferentes de inimigos (incluindo variantes maiores) (Inimigos maiores sempre dropam algum Perk)
 - Fases progressivas (rodadas com aumento de dificuldade)
 - Itens/perks
 	- Aumento de cadência de tiro
