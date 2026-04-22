@@ -4,7 +4,7 @@ Jogo estilo Galaxian desenvolvido para a disciplina de Computação Gráfica, us
 
 ## Descrição breve
 
-O jogador controla uma nave na parte inferior da tela e deve derrotar todos os inimigos para vencer a rodada. Os inimigos se movimentam em bloco, atiram contra o jogador e podem realizar ataque rasante em curva. Se a vida do jogador chegar a zero ou os inimigos avançarem demais, ocorre game over.
+O jogador controla uma nave na parte inferior da tela e deve derrotar todos os inimigos para vencer a rodada. Os inimigos se movimentam em bloco, podem realizar ataque rasante em curva e atiram contra o jogador durante esse rasante. Se a vida do jogador chegar a zero ou os inimigos avançarem demais, ocorre game over.
 
 ## Autor
 
@@ -39,7 +39,7 @@ O jogador controla uma nave na parte inferior da tela e deve derrotar todos os i
 - Colisão entre tiro do jogador e inimigos
 - Colisão entre tiros inimigos e nave
 - Condição de vitória (eliminar todos os inimigos)
-- Condição de derrota (vida zerada)
+- Condição de derrota (vida zerada ou inimigos passarem da tela)
 - Pausar/continuar com Esc
 - Reiniciar com confirmação in-game
 - Uso obrigatório de texturas (nave, inimigos, fundo, efeitos e HUD)
@@ -52,7 +52,7 @@ O jogador controla uma nave na parte inferior da tela e deve derrotar todos os i
 	- Explosão animada por spritesheet
 - Fundo com movimento vertical (scroll)
 - Rasante de inimigos com curva de Bézier
-- Tipos diferentes de inimigos (incluindo variantes maiores) (Inimigos maiores sempre dropam algum Perk)
+- Tipos diferentes de inimigos (incluindo variantes maiores) (variantes maiores sempre dropam algum perk)
 - Fases progressivas (rodadas com aumento de dificuldade)
 - Itens/perks
 	- Aumento de cadência de tiro
